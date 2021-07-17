@@ -111,6 +111,7 @@ class Text2048Env(gym.Env):
         assert self.action_space.contains(action)
         self._total_count += 1
 
+        self.prev_board = np.copy(self.board)
         view = np.rot90(self.board, k=action)
         changed = self._compress(view)
         action_score = self._merge(view)
@@ -135,6 +136,7 @@ class Text2048Env(gym.Env):
         self.last_action = None
         self.last_action_score = 0
         self._invalid_count, self._total_count = 0, 0
+        self.prev_board = np.zeros((self.size, self.size), dtype=np.int8)
         self.board = np.zeros((self.size, self.size), dtype=np.int8)
         self._add_random_tile()
         self._add_random_tile()

@@ -11,13 +11,14 @@ logger = logging.getLogger(__name__)
 class Text2048WithHeuristicEnv(Text2048Env):
     def __init__(self, size=4, merge_weight=0., empty_weight=0.,
                  monotonicity_weight=0., monotonicity_exp=1.,
-                 sum_weight=0., sum_exp=1.):
+                 sum_weight=0., sum_exp=1., shift_weight=0.):
         self.merge_weight = merge_weight
         self.empty_weight = empty_weight
         self.monotonicity_weight = monotonicity_weight
         self.monotonicity_exp = monotonicity_exp
         self.sum_weight = sum_weight
         self.sum_exp = sum_exp
+        self.shift_weight = shift_weight
         super(Text2048WithHeuristicEnv, self).__init__(size=size)
 
     def _calculate_state_value(self):
@@ -35,8 +36,9 @@ class Text2048WithHeuristicEnv(Text2048Env):
                     if value == prev:
                         count += 1
                     elif count > 1:
-                        merge += 1 + count
+                        merge += (1 + count) * value
                         count = 0
+                prev = value
             return merge
 
         # NOTE: maybe try taking the maximum of the lines and columns instead
@@ -60,11 +62,15 @@ class Text2048WithHeuristicEnv(Text2048Env):
         monotonicity = sum([score_monotonicity(self.board[i]) for i in range(self.size)])
         monotonicity += sum([score_monotonicity(self.board[:][j]) for j in range(self.size)])
 
+        # Count number of shifted tiles as penality
+        shifts = np.sum(self.board == self.prev_board)
+
         # Return weighted sum of heuristic scores
         return (self.empty_weight * empty +
-                self.merge_weight * merges -
-                self.monotonicity_weight * monotonicity -
-                self.sum_weight * tile_sum)
+                self.merge_weight * merges +
+                self.monotonicity_weight * monotonicity +
+                self.sum_weight * tile_sum -
+                self.shift_weight * shifts)
 
     def _get_reward(self):
         curr_value = self._calculate_state_value()
