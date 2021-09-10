@@ -50,6 +50,9 @@ class Text2048Env(gym.Env):
         else:
             self.observation_space = spaces.Box(0, 16, [size,size,1], dtype=int)
 
+        self.histogram = np.zeros(15, dtype = int)
+        self.board = np.zeros((self.size, self.size), dtype=np.int8)
+        self.moved_cells = 0
         self.seed(seed)
         self.reset()
 
@@ -67,14 +70,17 @@ class Text2048Env(gym.Env):
 
     def _compress(self, view):
         changed = False
+        moved_tiles = 0
         for j in range(self.size):
             count = 0
             for i in range(self.size):
                 if view[i][j] != 0:
                     view[count][j], view[i][j] = view[i][j], view[count][j]
                     if count != i:
+                        moved_tiles += 1
                         changed = True
                     count += 1
+        self.moved_cells = moved_tiles
         return changed
 
     def _merge(self, view):
@@ -84,7 +90,7 @@ class Text2048Env(gym.Env):
                 if view[i][j] == view[i + 1][j] and view[i][j] != 0:
                     view[i][j] += 1
                     view[i + 1][j] = 0
-                    reward += (2 ** view[i][j])
+                    reward += view[i][j]
         return reward
 
     def _is_done(self):
@@ -118,6 +124,8 @@ class Text2048Env(gym.Env):
         if changed or action_score > 0:
             self._compress(view)
             self._add_random_tile()
+            self._invalid_count -=1
+            self._invalid_count = max(0, self._invalid_count)
         else:
             # Invalid move
             self._invalid_count += 1
@@ -132,6 +140,7 @@ class Text2048Env(gym.Env):
         return self._get_board(), self._get_reward(), self._is_done(), {'score': self.score}
 
     def reset(self):
+        self.histogram[self.maximum_tile()] += 1
         self.score = 0
         self.last_action = None
         self.last_action_score = 0
@@ -167,3 +176,9 @@ class Text2048Env(gym.Env):
 
     def maximum_tile(self):
         return np.max(self.board)
+
+    def get_histogram(self):
+        return self.histogram
+
+    def reset_histogram(self):
+        self.histogram = np.zeros(15, dtype = int)

@@ -27,6 +27,8 @@ class Text2048WithHeuristicEnv(Text2048Env):
 
         # Count zeros on the board
         empty = self.size * self.size - np.count_nonzero(self.board)
+        if empty > (self.size * self.size * 3/4):
+                self.moved_cells = 0
 
         # Count possible merges on the board
         def count_merges(line):
@@ -46,15 +48,16 @@ class Text2048WithHeuristicEnv(Text2048Env):
         merges += sum([count_merges(self.board[:][j]) for j in range(self.size)])
 
         # Score the monotonicity of each row and column
+        # Count only if they are subsequent values
+        # Higher values get higher scores
         def score_monotonicity(line):
             left, right = 0., 0.
             for i in range(self.size):
-                if line[i-1] > line[i]:
-                    left += (pow(line[i-1], self.monotonicity_exp) -
-                             pow(line[i], self.monotonicity_exp))
-                else:
-                    right += (pow(line[i], self.monotonicity_exp) -
-                                           pow(line[i-1], self.monotonicity_exp))
+                if abs(line[i-1] - line[i] == 1):
+                    if line[i-1] > line[i]:
+                        left += pow(line[i], self.monotonicity_exp)
+                    else:
+                        right += pow(line[i-1], self.monotonicity_exp)
             # NOTE: original code from github.com/nneonneo/2048-ai/ uses min
             # instead of max. This doesn't seem to reward the correct behaviour
             return max(left, right)
@@ -63,20 +66,20 @@ class Text2048WithHeuristicEnv(Text2048Env):
         monotonicity += sum([score_monotonicity(self.board[:][j]) for j in range(self.size)])
 
         # Count number of shifted tiles as penality
-        shifts = np.sum(self.board == self.prev_board)
-
+        # shifts = np.sum(self.board == self.prev_board)
+        # print(f'mono: {monotonicity}, empty: {empty}, merges: {merges}, shifts: {shifts}, tilesum: {tile_sum}')
         # Return weighted sum of heuristic scores
         return (self.empty_weight * empty +
                 self.merge_weight * merges +
                 self.monotonicity_weight * monotonicity +
                 self.sum_weight * tile_sum -
-                self.shift_weight * shifts)
+                self.shift_weight * self.moved_cells)
 
     def _get_reward(self):
         curr_value = self._calculate_state_value()
         prev_value = self.last_state_value
         self.last_state_value = curr_value
-        return curr_value - prev_value
+        return self.last_action_score + 2 * curr_value #- prev_value
 
     def reset(self):
         obs = super(Text2048WithHeuristicEnv, self).reset()
