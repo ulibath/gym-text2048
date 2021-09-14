@@ -35,7 +35,7 @@ class Text2048Env(gym.Env):
     metadata = {'render.modes': ['human', 'ansi']}
 
     def __init__(self, size=4, one_hot=True,
-                 invalid_move_penalty=-512, invalid_move_warmup=16,
+                 invalid_move_penalty=-512, invalid_move_warmup=32,
                  invalid_move_threshold=0.1, seed=None):
         self.size = size
         self._one_hot = one_hot
@@ -80,8 +80,7 @@ class Text2048Env(gym.Env):
                         moved_tiles += 1
                         changed = True
                     count += 1
-        self.moved_cells = moved_tiles
-        return changed
+        return changed, moved_tiles
 
     def _merge(self, view):
         reward = 0
@@ -90,7 +89,7 @@ class Text2048Env(gym.Env):
                 if view[i][j] == view[i + 1][j] and view[i][j] != 0:
                     view[i][j] += 1
                     view[i + 1][j] = 0
-                    reward += view[i][j]
+                    reward += (2 ** view[i][j])
         return reward
 
     def _is_done(self):
@@ -119,13 +118,14 @@ class Text2048Env(gym.Env):
 
         self.prev_board = np.copy(self.board)
         view = np.rot90(self.board, k=action)
-        changed = self._compress(view)
+        changed, moved_tiles = self._compress(view)
+        self.moved_cells = moved_tiles
         action_score = self._merge(view)
         if changed or action_score > 0:
             self._compress(view)
             self._add_random_tile()
-            self._invalid_count -=1
-            self._invalid_count = max(0, self._invalid_count)
+            #self._invalid_count -=1
+            #self._invalid_count = max(0, self._invalid_count)
         else:
             # Invalid move
             self._invalid_count += 1
